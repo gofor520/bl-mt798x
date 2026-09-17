@@ -46,6 +46,12 @@ int __weak failsafe_write_image(const void *data, size_t size, failsafe_fw_t fw)
 	return -ENOSYS;
 }
 
+int __weak failsafe_read_image(void *data, size_t max_size, size_t *size,
+			       failsafe_fw_t fw)
+{
+	return -ENOSYS;
+}
+
 static int output_plain_file(struct httpd_response *response,
 			     const char *filename)
 {
@@ -153,6 +159,14 @@ static void upload_handler(enum httpd_uri_handler_status status,
 #ifdef CONFIG_MEDIATEK_MULTI_MTD_LAYOUT
 		mtd = httpd_request_find_value(request, "mtd_layout");
 #endif
+		goto done;
+	}
+
+	fw = httpd_request_find_value(request, "eeprom");
+	if (fw) {
+		fw_type = FW_TYPE_EEPROM;
+		if (failsafe_validate_image(fw->data, fw->size, fw_type))
+			goto fail;
 		goto done;
 	}
 
@@ -375,6 +389,70 @@ static void mtd_layout_handler(enum httpd_uri_handler_status status,
 	response->info.content_type = "text/plain";
 }
 
+/*
+ * Upper bound of the EEPROM image served as a backup download. It is large
+ * enough for the biggest factory partition found on MT798x boards (4MiB).
+ */
+#define EEPROM_DUMP_MAX_SIZE	(8 * 1024 * 1024)
+
+static void eeprom_download_handler(enum httpd_uri_handler_status status,
+	struct httpd_request *request,
+	struct httpd_response *response)
+{
+	int ret = -ENOSYS;
+	size_t size = 0;
+	void *buf;
+
+	if (status != HTTP_CB_NEW)
+		return;
+
+	response->status = HTTP_RESP_STD;
+	response->info.connection_close = 1;
+
+	/*
+	 * The read is performed in the same scratch RAM region used to receive
+	 * uploaded images, which is far larger than any EEPROM partition and
+	 * avoids a multi-megabyte allocation on a small U-Boot heap.
+	 *
+	 * Serving a response from that region invalidates the upload identifier
+	 * so a firmware/EEPROM image uploaded by another connection can no
+	 * longer be written back later on, which would otherwise flash whatever
+	 * this download left in that memory.
+	 */
+	upload_id = rand();
+
+	buf = httpd_get_upload_buffer_ptr(EEPROM_DUMP_MAX_SIZE);
+
+	if (!buf) {
+		ret = -ENOMEM;
+	} else {
+		ret = failsafe_read_image(buf, EEPROM_DUMP_MAX_SIZE, &size,
+					  FW_TYPE_EEPROM);
+
+		if (!ret && size) {
+			response->data = buf;
+			response->size = size;
+
+			response->info.code = 200;
+			response->info.content_type =
+				"application/octet-stream";
+
+			return;
+		}
+	}
+
+	printf("failsafe: EEPROM backup failed (%d)\n", ret);
+
+	response->data = "Error: failed to read the EEPROM (factory) partition.\n"
+			 "Make sure your board provides a 'factory' partition, "
+			 "or set the 'eeprom_part' environment variable to its "
+			 "name.\n";
+	response->size = strlen(response->data);
+
+	response->info.code = 500;
+	response->info.content_type = "text/plain";
+}
+
 int start_web_failsafe(void)
 {
 	struct httpd_instance *inst;
@@ -394,6 +472,8 @@ int start_web_failsafe(void)
 	httpd_register_uri_handler(inst, "/booting.html", &html_handler, NULL);
 	httpd_register_uri_handler(inst, "/cgi-bin/luci", &index_handler, NULL);
 	httpd_register_uri_handler(inst, "/cgi-bin/luci/", &index_handler, NULL);
+	httpd_register_uri_handler(inst, "/eeprom.bin", &eeprom_download_handler, NULL);
+	httpd_register_uri_handler(inst, "/eeprom.html", &html_handler, NULL);
 	httpd_register_uri_handler(inst, "/fail.html", &html_handler, NULL);
 	httpd_register_uri_handler(inst, "/flashing.html", &html_handler, NULL);
 	httpd_register_uri_handler(inst, "/getmtdlayout", &mtd_layout_handler, NULL);

@@ -83,6 +83,9 @@ struct httpd_uri_handler {
 /* Last valid upload identifier */
 extern u32 upload_id;
 
+/* Get a scratch RAM region usable to hold a whole upload/download payload */
+void *httpd_get_upload_buffer_ptr(size_t size);
+
 /* Find existing http server instance */
 struct httpd_instance *httpd_find_instance(u16 port);
 

@@ -1,0 +1,49 @@
+<!DOCTYPE HTML>
+<html data-page-node-id="j9cE9QDiUwogeRsF4GYdNo">
+	<head data-page-node-id="dijBTAvA75cLbx5IzTN75m">
+		<meta charset="utf-8" data-page-node-id="7CokpFeBiSsK2nqqGgGCUp">
+		<title>EEPROM update</title>
+		<link rel="stylesheet" href="/style.css" data-page-node-id="HuH2D4Qv49AuM84HfutHW9">
+		<script src="/main.js"></script>
+	</head>
+	<body onload="getversion()" data-page-node-id="XRPXeRwuNFf0jAsp3H0xgG">
+		<div id="m" data-page-node-id="RlZRjEAYWjkug7aUDOkcvm">
+			<h1 data-page-node-id="dEpw5TdWLSOBHYxGfzjqNh">EEPROM UPDATE</h1>
+			<p id="hint" data-page-node-id="JaNbaXsXrRxc0Wy72CCc8o">
+				You are going to update the <strong data-page-node-id="ICupxIhWGHN7wlcQRlc8bz">EEPROM (factory data)</strong> partition on the device.<br data-page-node-id="PKcDfDpCtr4OUTsnVJACAy">
+				It holds the MAC addresses and the WiFi calibration data, so be sure to use a dump taken from a device of the very same model.<br data-page-node-id="BvnkMI3HDfUGBFGa8qFA2W">
+				Please, choose file from your local hard drive and click <strong data-page-node-id="izxRsSvCQYA4HyQP3Shjvr">Upload</strong> button.
+			</p>
+			<form id="form" data-page-node-id="LRDw9ZUEHjciBT9un1gxrj">
+				<input id="file" type="file" name="eeprom" data-page-node-id="hzpKdebwFW1Sk6U49HN5zH">
+				<input type="button" value="Upload" onclick="upload('eeprom')" data-page-node-id="VuWZmhP5I46REEN5GEn7v7">
+			</form>
+			<div data-page-node-id="qePLoZnw38KN3mxleDK9Po">
+				<div class="bar" id="bar" style="display: none; --percent: 0;" data-page-node-id="5jCIbU3OYWTH2izW5DDjUO"></div>
+			</div>
+			<div id="size" style="display: none;" data-page-node-id="iOiakuIgBeoh851M3IV9ws">Size: xxxx</div>
+			<div id="md5" style="display: none;" data-page-node-id="GwQIt8QhxjqsArIExNTi4z">MD5: xxxx</div>
+			<div id="upgrade" style="display: none;" data-page-node-id="GNvScZfEJN1H4iXzFH7FrN">
+				<p data-page-node-id="GCjp4bM2M1B8LJtNfQwwuw">If all information above is correct, click "Update".</p>
+				<button class="button" onclick="location = '/flashing.html'" data-page-node-id="68dovsO2wCa8maNS9qV0tX">Update</button>
+			</div>
+			<div class="i w" data-page-node-id="PSidWsRk4wBQNNQkfh1Ayq">
+				<strong data-page-node-id="8FLYEoW2Uckcq30U4OMtkl">WARNINGS</strong>
+				<ul data-page-node-id="cI7iFqopnteVdlLvE5bGPZ">
+					<li data-page-node-id="NJAbzRicV47BzDUvzS3HSe">do not power off the device during update</li>
+					<li data-page-node-id="zeAnXQNeD5lgp8F46dzwsc">if everything goes well, the device will restart</li>
+					<li data-page-node-id="iWdtSPcYpFO0f7UupAJxQo">updating the EEPROM with a dump from another model may break WiFi and wired network</li>
+					<li data-page-node-id="LRKtSIKOx3aZVGupYxJfOi">keep a backup before updating, use the "Backup" button below</li>
+				</ul>
+			</div>
+			<div id="backup" data-page-node-id="fvSygnz4bXyzysmhp5zoO9">
+				<button class="button" onclick="location = '/eeprom.bin'" data-page-node-id="P0uc1B0kDs75K7QoOo7HGu">Backup</button>
+				<p id="backup_hint" data-page-node-id="6Ca2DSjahksLpnAxX2Oiy3">
+					Backup downloads the current <strong data-page-node-id="b83EHXYKmMnDw6GxkwzXvL">EEPROM (factory data)</strong> partition as a file.<br data-page-node-id="ezNrh1FdzfswtecfSHjYBn">
+					Save it, as it is the only way to restore the device to its current state.
+				</p>
+			</div>
+		</div>
+		<div id="version" data-page-node-id="ZpUbLL7wExFivBz2m0E4Ax"></div>
+	</body>
+</html>

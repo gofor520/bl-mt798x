@@ -115,6 +115,18 @@ ul {
 	font-size: 2em;
 }
 
+#backup {
+	text-align: center;
+}
+
+#backup p {
+	margin: 15px 0 0;
+}
+
+#nav {
+	text-align: center;
+}
+
 .button {
 	box-shadow: inset 0px -3px 7px 0px #29bbff;
 	background: linear-gradient(to bottom, #2dabf9 5%, #0688fa 100%);

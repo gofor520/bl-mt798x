@@ -24,6 +24,8 @@ struct data_part_entry;
 
 typedef int (*data_handler_t)(void *priv, const struct data_part_entry *dpe,
 			      const void *data, size_t size);
+typedef int (*data_read_handler_t)(void *priv, const struct data_part_entry *dpe,
+				   void *data, size_t max_size, size_t *size);
 
 struct data_part_entry {
 	const char *name;
@@ -35,6 +37,7 @@ struct data_part_entry {
 	data_handler_t validate;
 	data_handler_t write;
 	data_handler_t do_post_action;
+	data_read_handler_t read;
 };
 
 extern void board_upgrade_data_parts(const struct data_part_entry **dpes,

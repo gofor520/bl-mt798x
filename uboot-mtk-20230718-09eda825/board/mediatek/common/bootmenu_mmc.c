@@ -5,6 +5,7 @@
  * Author: Weijie Gao <weijie.gao@mediatek.com>
  */
 #include <command.h>
+#include <env.h>
 #include <linux/sizes.h>
 #include <errno.h>
 #include <dm/ofnode.h>
@@ -28,6 +29,115 @@ static int write_part(const char *partname, const void *data, size_t size,
 		      bool verify)
 {
 	return mmc_write_part(MMC_DEV_INDEX, 0, partname, data, size, verify);
+}
+
+/*
+ * The GPT partition holding the factory data (MAC addresses and WiFi
+ * calibration data, commonly referred to as EEPROM) is not named identically
+ * on all boards, so probe a list of known names. Setting the 'eeprom_part'
+ * env variable takes precedence, which also covers boards using a custom name.
+ */
+static const char * const eeprom_part_names[] = {
+	"factory",
+	"Factory",
+};
+
+static const char *get_eeprom_part_name(u64 *size)
+{
+	const char *env_name = env_get("eeprom_part");
+	u64 part_size;
+	u32 i;
+	int ret;
+
+	if (env_name && *env_name) {
+		ret = mmc_read_part_size(MMC_DEV_INDEX, 0, env_name, &part_size);
+		if (!ret) {
+			*size = part_size;
+			return env_name;
+		}
+
+		cprintln(ERROR, "*** EEPROM partition '%s' not found! ***",
+			 env_name);
+	}
+
+	for (i = 0; i < ARRAY_SIZE(eeprom_part_names); i++) {
+		ret = mmc_read_part_size(MMC_DEV_INDEX, 0, eeprom_part_names[i],
+					 &part_size);
+		if (!ret) {
+			*size = part_size;
+			return eeprom_part_names[i];
+		}
+	}
+
+	cprintln(ERROR, "*** EEPROM (factory) partition not found! ***");
+
+	return NULL;
+}
+
+static int validate_eeprom_image(void *priv, const struct data_part_entry *dpe,
+				 const void *data, size_t size)
+{
+	u64 part_size;
+
+	if (!size) {
+		cprintln(ERROR, "*** EEPROM image is empty ***");
+		return -EINVAL;
+	}
+
+	if (!get_eeprom_part_name(&part_size))
+		return -ENODEV;
+
+	if ((u64)size > part_size) {
+		cprintln(ERROR, "*** EEPROM image too large (0x%zx > 0x%llx) ***",
+			 size, part_size);
+		return -ENOSPC;
+	}
+
+	return 0;
+}
+
+static int write_eeprom(void *priv, const struct data_part_entry *dpe,
+			const void *data, size_t size)
+{
+	const char *part_name;
+	u64 part_size;
+
+	part_name = get_eeprom_part_name(&part_size);
+	if (!part_name)
+		return -ENODEV;
+
+	if ((u64)size > part_size) {
+		cprintln(ERROR, "*** EEPROM image too large (0x%zx > 0x%llx) ***",
+			 size, part_size);
+		return -ENOSPC;
+	}
+
+	if ((u64)size < part_size)
+		cprintln(CAUTION, "*** EEPROM image is smaller than the partition (0x%zx < 0x%llx), the tail will be kept untouched ***",
+			 size, part_size);
+
+	return mmc_write_part(MMC_DEV_INDEX, 0, part_name, data, size, true);
+}
+
+static int read_eeprom(void *priv, const struct data_part_entry *dpe,
+		       void *data, size_t max_size, size_t *size)
+{
+	const char *part_name;
+	u64 part_size;
+
+	part_name = get_eeprom_part_name(&part_size);
+	if (!part_name)
+		return -ENODEV;
+
+	if (part_size > (u64)max_size) {
+		cprintln(ERROR, "*** EEPROM partition too large to read (0x%llx > 0x%zx) ***",
+			 part_size, max_size);
+		return -ENOBUFS;
+	}
+
+	*size = (size_t)part_size;
+
+	return mmc_read_part(MMC_DEV_INDEX, 0, part_name, data, *size);
 }
 
 #ifdef CONFIG_MTK_FIP_SUPPORT
@@ -340,6 +450,14 @@ static const struct data_part_entry mmc_parts[] = {
 		.abbr = "gpt",
 		.env_name = "bootfile.gpt",
 		.write = write_gpt,
+	},
+	{
+		.name = "EEPROM (factory data)",
+		.abbr = "eeprom",
+		.env_name = "bootfile.eeprom",
+		.validate = validate_eeprom_image,
+		.write = write_eeprom,
+		.read = read_eeprom,
 	}
 };
 

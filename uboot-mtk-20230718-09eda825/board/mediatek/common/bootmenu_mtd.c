@@ -5,6 +5,7 @@
  * Author: Weijie Gao <weijie.gao@mediatek.com>
  */
 
+#include <env.h>
 #include <mtd.h>
 #include <ubi_uboot.h>
 #include <linux/mtd/mtd.h>
@@ -87,6 +88,124 @@ static int write_part(const char *partname, const void *data, size_t size,
 		return -PTR_ERR(mtd);
 
 	ret = mtd_update_generic(mtd, data, size, verify);
+
+	put_mtd_device(mtd);
+
+	return ret;
+}
+
+/*
+ * The partition holding the factory data (MAC addresses and WiFi calibration
+ * data, commonly referred to as EEPROM) is not named identically on all
+ * boards, so probe a list of known names. Setting the 'eeprom_part' env
+ * variable takes precedence, which also covers boards using a custom name.
+ */
+static const char * const eeprom_part_names[] = {
+	"factory",
+	"Factory",
+};
+
+static struct mtd_info *get_eeprom_part(void)
+{
+	const char *env_name = env_get("eeprom_part");
+	struct mtd_info *mtd = NULL;
+	u32 i;
+
+	gen_mtd_probe_devices();
+
+	if (env_name && *env_name) {
+		mtd = get_mtd_device_nm(env_name);
+		if (IS_ERR(mtd)) {
+			cprintln(ERROR, "*** EEPROM partition '%s' not found! ***",
+				 env_name);
+			mtd = NULL;
+		}
+	}
+
+	for (i = 0; !mtd && i < ARRAY_SIZE(eeprom_part_names); i++) {
+		mtd = get_mtd_device_nm(eeprom_part_names[i]);
+		if (IS_ERR(mtd))
+			mtd = NULL;
+	}
+
+	if (!mtd)
+		cprintln(ERROR, "*** EEPROM (factory) partition not found! ***");
+
+	return mtd;
+}
+
+static int validate_eeprom_image(void *priv, const struct data_part_entry *dpe,
+				 const void *data, size_t size)
+{
+	struct mtd_info *mtd;
+	int ret = 0;
+
+	if (!size) {
+		cprintln(ERROR, "*** EEPROM image is empty ***");
+		return -EINVAL;
+	}
+
+	mtd = get_eeprom_part();
+	if (!mtd)
+		return -ENODEV;
+
+	if ((u64)size > mtd->size) {
+		cprintln(ERROR, "*** EEPROM image too large (0x%zx > 0x%llx) ***",
+			 size, mtd->size);
+		ret = -ENOSPC;
+	}
+
+	put_mtd_device(mtd);
+
+	return ret;
+}
+
+static int write_eeprom(void *priv, const struct data_part_entry *dpe,
+			const void *data, size_t size)
+{
+	struct mtd_info *mtd;
+	int ret;
+
+	mtd = get_eeprom_part();
+	if (!mtd)
+		return -ENODEV;
+
+	if ((u64)size > mtd->size) {
+		cprintln(ERROR, "*** EEPROM image too large (0x%zx > 0x%llx) ***",
+			 size, mtd->size);
+		put_mtd_device(mtd);
+		return -ENOSPC;
+	}
+
+	if ((u64)size < mtd->size)
+		cprintln(CAUTION, "*** EEPROM image is smaller than the partition (0x%zx < 0x%llx), the tail will be kept untouched ***",
+			 size, mtd->size);
+
+	ret = mtd_update_generic(mtd, data, size, true);
+
+	put_mtd_device(mtd);
+
+	return ret;
+}
+
+static int read_eeprom(void *priv, const struct data_part_entry *dpe,
+		       void *data, size_t max_size, size_t *size)
+{
+	struct mtd_info *mtd;
+	int ret;
+
+	mtd = get_eeprom_part();
+	if (!mtd)
+		return -ENODEV;
+
+	if (mtd->size > (u64)max_size) {
+		cprintln(ERROR, "*** EEPROM partition too large to read (0x%llx > 0x%zx) ***",
+			 mtd->size, max_size);
+		put_mtd_device(mtd);
+		return -ENOBUFS;
+	}
+
+	ret = mtd_read_skip_bad(mtd, 0, mtd->size, mtd->size, size, data);
 
 	put_mtd_device(mtd);
 
@@ -400,6 +519,14 @@ static const struct data_part_entry mtd_parts[] = {
 		.env_name = "bootfile.simg",
 		.validate = validate_simg_image,
 		.write = write_flash_image,
+	},
+	{
+		.name = "EEPROM (factory data)",
+		.abbr = "eeprom",
+		.env_name = "bootfile.eeprom",
+		.validate = validate_eeprom_image,
+		.write = write_eeprom,
+		.read = read_eeprom,
 	},
 };
 

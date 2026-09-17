@@ -28,6 +28,7 @@ const char *fw_to_part_name(failsafe_fw_t fw)
 		case FW_TYPE_BL2: return "bl2";
 		case FW_TYPE_FIP: return "fip";
 		case FW_TYPE_FW: return "fw";
+		case FW_TYPE_EEPROM: return "eeprom";
 		default: return "err";
 	}
 }
@@ -76,6 +77,31 @@ int failsafe_validate_image(const void *data, size_t size, failsafe_fw_t fw)
 		return dpe->validate(dpe->priv, dpe, data, size);
 
 	return 0;
+}
+
+int failsafe_read_image(void *data, size_t max_size, size_t *size,
+			failsafe_fw_t fw)
+{
+	const struct data_part_entry *upgrade_parts, *dpe;
+	u32 num_parts;
+
+	*size = 0;
+
+	board_upgrade_data_parts(&upgrade_parts, &num_parts);
+
+	if (!upgrade_parts || !num_parts) {
+		printf("mtkupgrade is not configured!\n");
+		return -ENOSYS;
+	}
+
+	dpe = find_part(upgrade_parts, num_parts, fw_to_part_name(fw));
+	if (!dpe)
+		return -ENODEV;
+
+	if (!dpe->read)
+		return -ENOSYS;
+
+	return dpe->read(dpe->priv, dpe, data, max_size, size);
 }
 
 int failsafe_write_image(const void *data, size_t size, failsafe_fw_t fw)

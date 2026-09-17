@@ -17,6 +17,10 @@ obj-y += booting.o
 FILE_booting.o := booting.html
 FSPATH_booting.o := booting.html
 
+obj-y += eeprom.o
+FILE_eeprom.o := eeprom.html
+FSPATH_eeprom.o := eeprom.html
+
 obj-y += fail.o
 FILE_fail.o := fail.html
 FSPATH_fail.o := fail.html
