@@ -1,1 +1,3 @@
-mt7981_tplink_wma301v2_defconfig
+_PLAT_MT7981=y
+_MT7981_BOARD_BGA=y
+_LOG_LEVEL_INFO=y
